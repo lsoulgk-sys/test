@@ -81,7 +81,7 @@ jobs:
             bootloader
             tools
             modules
-          key: ${{ hashFiles('/tmp/zmk-config/config/west.yml') }}
+          key: zmk-west-${{ hashFiles('config/west.yml') }}
 
       - name: West Init
         run: west init -l /tmp/zmk-config || true
