@@ -10,7 +10,7 @@ jobs:
       has_valid_build_matrix: ${{ steps.fetch.outputs.has_valid_build_matrix }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Fetch Build Matrix
         id: fetch
@@ -44,7 +44,7 @@ jobs:
           curl -fsSL https://deb.nodesource.com/setup_22.x | bash && apt install -y nodejs
 
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Create build directory
         run: mkdir build
@@ -74,7 +74,7 @@ jobs:
           cp -R "config" /tmp/zmk-config/config
 
       - name: Cache west modules
-        uses: actions/cache@v6
+        uses: actions/cache@v4
         with:
           path: |
             zephyr
