@@ -1,0 +1,14 @@
+
+file_format: "1"
+id: ortho_4row
+name: ortho_4row
+type: shield
+features:
+  - keys
+  - studio
+outputs:
+  - usb
+  - ble
+siblings:
+  - ortho_4row_left
+  - ortho_4row_right

@@ -1,0 +1,24 @@
+
+if SHIELD_ORTHO_4ROW_RIGHT
+
+config ZMK_KEYBOARD_NAME
+    default "ortho_4row"
+
+endif
+
+if SHIELD_ORTHO_4ROW_LEFT || SHIELD_ORTHO_4ROW_RIGHT
+
+config ZMK_SPLIT
+    default y
+
+endif
+
+if SHIELD_ORTHO_4ROW_RIGHT
+
+config ZMK_POINTING
+    default y
+
+config PAW3222
+    default y
+
+endif
