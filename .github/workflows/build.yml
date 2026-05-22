@@ -2,5 +2,170 @@ name: Build ZMK firmware
 on: [push, pull_request, workflow_dispatch]
 
 jobs:
+  matrix:
+    runs-on: ubuntu-22.04
+    name: Fetch Build Keyboards
+    outputs:
+      build_matrix: ${{ env.build_matrix }}
+      has_valid_build_matrix: ${{ steps.fetch.outputs.has_valid_build_matrix }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Fetch Build Matrix
+        id: fetch
+        run: |
+          matrix_content=$(yq -oj -I0 'build.yaml')
+
+          if [ -z "$matrix_content" ] || [ "$matrix_content" = "null" ]; then
+            echo "::notice file=build.yaml,title=Empty build matrix file::To add a keyboard to the build, see https://zmk.dev/docs/user-setup#add-a-keyboard."
+            echo "has_valid_build_matrix=false" >> $GITHUB_OUTPUT
+          else
+            echo "build_matrix=$matrix_content" >> $GITHUB_ENV
+            echo "has_valid_build_matrix=true" >> $GITHUB_OUTPUT
+            echo "$matrix_content"
+          fi
+
   build:
-    uses: zmkfirmware/zmk/.github/workflows/build-user-config.yml@main
+    runs-on: ubuntu-latest
+    if: needs.matrix.outputs.has_valid_build_matrix == 'true'
+    container:
+      image: zmkfirmware/zmk-build-arm:stable
+    needs: matrix
+    name: Build
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.matrix.outputs.build_matrix) }}
+    steps:
+      - name: Act Workaround # https://github.com/nektos/act/issues/973
+        if: ${{ env.ACT }}
+        run: |
+          apt-get update && apt-get install -y curl unzip
+          curl -fsSL https://deb.nodesource.com/setup_22.x | bash && apt install -y nodejs
+
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Create build directory
+        run: mkdir build
+
+      - name: Prepare variables
+        run: |
+          SHIELD="${{ matrix.shield }}"
+          BOARD="${{ matrix.board }}"
+          SNIPPET="${{ matrix.snippet }}"
+          CMAKE_ARGS="${{ matrix.cmake-args }}"
+
+          if [ ! -z "${SHIELD}" ]; then
+            DISPLAY_NAME="${SHIELD} - ${BOARD}"
+          else
+            DISPLAY_NAME="${BOARD}"
+          fi
+
+          echo "board=${BOARD}" >> $GITHUB_ENV
+          echo "shield=${SHIELD}" >> $GITHUB_ENV
+          echo "snippet=${SNIPPET}" >> $GITHUB_ENV
+          echo "cmake_args=${CMAKE_ARGS}" >> $GITHUB_ENV
+          echo "display_name=${DISPLAY_NAME}" >> $GITHUB_ENV
+
+      - name: Copy config files to isolated temporary directory
+        run: |
+          mkdir /tmp/zmk-config
+          cp -R "config" /tmp/zmk-config/config
+
+      - name: Cache west modules
+        uses: actions/cache@v6
+        with:
+          path: |
+            zephyr
+            bootloader
+            tools
+            modules
+          key: ${{ hashFiles('/tmp/zmk-config/config/west.yml') }}
+
+      - name: West Init
+        run: west init -l /tmp/zmk-config || true
+
+      - name: Downgrade CMake (Zephyr 4.1.0 + CMake 3.31 incompatibility)
+        run: pip install cmake==3.30.5
+
+      - name: West Update
+        run: west update
+
+      - name: Check ZMK revision
+        id: zmk-revision
+        run: |
+          echo "zmk_revision=$(git -C ${{ env.base_dir }}/zmk rev-parse --short HEAD)" >> $GITHUB_ENV
+          echo "$(git -C ${{ env.base_dir }}/zmk rev-parse --short HEAD)"
+
+      - name: West Zephyr export
+        run: west zephyr-export
+
+      - name: West Build (${{ env.display_name }})
+        run: |
+          west build -s zmk/app -d "/tmp/tmp.$$$" -b "${{ env.board }}" -S "${{ env.snippet }}" -- \
+            -DZMK_CONFIG=/tmp/zmk-config/config \
+            -DSHIELD="${{ env.shield }}" \
+            -DZMK_EXTRA_MODULES='${{ env.GITHUB_WORKSPACE }}/.' \
+            ${{ env.cmake_args }}
+
+      - name: Warn about building from main if build fails
+        if: ${{ failure() }}
+        run: |
+          if [ "${{ env.zmk_revision }}" = "main" ] && [ ! -z "${{ env.ACT }}" ]; then
+            echo "::warning file=config/west.yml,title=Main branch unstable::Building from the main branch is unstable and may produce unexpected errors - see https://zmk.dev/docs/user-setup#unstable-builds"
+          fi
+
+      - name: ${{ env.display_name }} Kconfig file
+        run: |
+          if [ -f "${{ env.build_dir }}/zephyr/.config" ]
+          then
+            grep -v -e "^#" -e "^$" "${{ env.build_dir }}/zephyr/.config" | sort
+          else
+            echo "No Kconfig output"
+          fi
+        if: ${{ !cancelled() }}
+
+      - name: ${{ env.display_name }} Devicetree file
+        run: |
+          if [ -f "${{ env.build_dir }}/zephyr/zephyr.dts" ]
+          then
+            cat "${{ env.build_dir }}/zephyr/zephyr.dts"
+          elif [ -f "${{ env.build_dir }}/zephyr/zephyr.dts.pre" ]
+          then
+            cat -s "${{ env.build_dir }}/zephyr/zephyr.dts.pre"
+          else
+            echo "No Devicetree output"
+          fi
+        if: ${{ !cancelled() }}
+
+      - name: Rename artifacts
+        shell: sh -x {0}
+        run: |
+          mkdir "${{ env.build_dir }}/artifacts"
+          if [ -f "${{ env.build_dir }}/zephyr/zmk.uf2" ]
+          then
+            cp "${{ env.build_dir }}/zephyr/zmk.uf2" "${{ env.build_dir }}/artifacts/${{ env.display_name }}.uf2"
+          elif [ -f "${{ env.build_dir }}/zephyr/zmk.bin" ]
+          then
+            cp "${{ env.build_dir }}/zephyr/zmk.bin" "${{ env.build_dir }}/artifacts/${{ env.display_name }}.bin"
+          fi
+
+      - name: Archive (${{ env.display_name }})
+        uses: actions/upload-artifact@v4
+        with:
+          name: artifact-${{ env.display_name }}
+          path: ${{ env.build_dir }}/artifacts
+
+  merge:
+    runs-on: ubuntu-latest
+    if: needs.matrix.outputs.has_valid_build_matrix == 'true'
+    needs: build
+    name: Merge Output Artifacts
+    steps:
+      - name: Merge Artifacts
+        uses: actions/upload-artifact/merge@v4
+        with:
+          name: firmware
+          pattern: artifact-*
+          delete-merged: true
