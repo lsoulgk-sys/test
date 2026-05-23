@@ -27,10 +27,9 @@
 #define JP_EISU         LANGUAGE_2        // 英数
 #define JP_HANZEN       GRAVE             // 半角/全角
 
-// Mouse button aliases for ZMK main branch compatibility
-#define MB1 LCLK
-#define MB2 RCLK
-#define MB3 MCLK
+// Additional mouse button aliases (MB1-MB3 already defined in zmk/pointing.h)
+#define MB4 BIT(3)
+#define MB5 BIT(4)
 
 / {
     macros {
