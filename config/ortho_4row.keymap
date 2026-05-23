@@ -28,11 +28,21 @@
 #define JP_HANZEN       GRAVE             // 半角/全角
 
 // Mouse button aliases for ZMK main branch compatibility
+#ifndef MB1
 #define MB1 1
+#endif
+#ifndef MB2
 #define MB2 2
+#endif
+#ifndef MB3
 #define MB3 4
+#endif
+#ifndef MB4
 #define MB4 8
+#endif
+#ifndef MB5
 #define MB5 16
+#endif
 
 / {
     macros {
