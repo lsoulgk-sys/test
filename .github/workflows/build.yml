@@ -85,8 +85,11 @@ jobs:
 
       - name: Downgrade CMake (Zephyr 4.1.0 + CMake 3.31 incompatibility)
         run: |
+          cmake --version || true
           apt-get update && apt-get install -y python3-pip
+          rm -f /usr/local/bin/cmake /usr/local/bin/ctest /usr/local/bin/cpack
           pip3 install --break-system-packages cmake==3.30.5
+          cmake --version
 
       - name: West Update
         run: west update
