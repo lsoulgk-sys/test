@@ -67,7 +67,7 @@
 
         arrow {
             bindings = <
-&kp ESC    &none        &none      &none          &none     &none  &none  &none    &kp PAGE_DOWN  &kp K_MUTE       &kp C_VOLUME_DOWN  &kp C_VOLUME_UP  &none        &tog 7
+&kp ESC    &none        &none      &none          &none     &none  &none  &none    &kp PAGE_DOWN  &kp K_MUTE       &kp C_VOLUME_DOWN  &kp C_VOLUME_UP  &none        &bt BT_CLR_ALL
 &kp TAB    &none        &none      &kp LGUI       &kp BSPC  &none  &none  &none    &kp PAGE_DOWN  &kp DEL          &kp UP_ARROW       &kp BSPC         &none        &bt BT_SEL 2
 &kp LSHFT  &kp LA(TAB)  &kp LCTRL  &kp LSHFT      &kp BSPC  &none  &none  &none    &kp LC(C)      &kp LEFT         &kp DOWN           &kp RIGHT        &kp ENTER    &bt BT_SEL 1
 &kp LCTRL  &kp LALT     &kp LGUI   &kp PAGE_DOWN  &none     &none  &none  &none    &kp LC(V)      &kp LC(LS(TAB))  &none              &kp LC(TAB)      &kp LA(TAB)  &bt BT_SEL 0
