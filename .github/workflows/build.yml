@@ -117,6 +117,18 @@ jobs:
           echo "zmk_revision=${zmk_revision}" >> $GITHUB_ENV
           echo "ZMK revision: ${zmk_revision}"
 
+      - name: Diagnostic - list modules and SoC paths
+        working-directory: ${{ env.base_dir }}
+        run: |
+          echo "=== West list ==="
+          west list || true
+          echo "=== SoC Kconfig files ==="
+          find . -path "*/soc/*/Kconfig.defconfig" -type f 2>/dev/null | head -20 || echo "(none found)"
+          echo "=== Nordic SoC dirs ==="
+          find . -path "*/soc/*nordic*" -type d 2>/dev/null | head -10 || echo "(none found)"
+          echo "=== HAL modules ==="
+          ls -d modules/hal* 2>/dev/null || echo "(no hal modules)"
+
       - name: West Zephyr export
         working-directory: ${{ env.base_dir }}
         run: west zephyr-export
