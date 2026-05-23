@@ -37,7 +37,7 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJson(needs.matrix.outputs.build_matrix) }}
     steps:
-      - name: Act Workaround # https://github.com/nektos/act/issues/973
+      - name: Act Workaround
         if: ${{ env.ACT }}
         run: |
           apt-get update && apt-get install -y curl unzip
@@ -47,77 +47,90 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Create build directory
-        run: mkdir build
+        run: |
+          echo "build_dir=$(mktemp -d)" >> $GITHUB_ENV
 
       - name: Prepare variables
+        shell: bash -x {0}
+        env:
+          board: ${{ matrix.board }}
+          shield: ${{ matrix.shield }}
+          artifact_name: ${{ matrix.artifact-name }}
+          snippet: ${{ matrix.snippet }}
         run: |
-          SHIELD="${{ matrix.shield }}"
-          BOARD="${{ matrix.board }}"
-          SNIPPET="${{ matrix.snippet }}"
-          CMAKE_ARGS="${{ matrix.cmake-args }}"
-
-          if [ ! -z "${SHIELD}" ]; then
-            DISPLAY_NAME="${SHIELD} - ${BOARD}"
+          if [ -e zephyr/module.yml ]; then
+            export zmk_load_arg=" -DZMK_EXTRA_MODULES='${GITHUB_WORKSPACE}'"
+            new_tmp_dir="${TMPDIR:-/tmp}/zmk-config"
+            mkdir -p "${new_tmp_dir}"
+            echo "base_dir=${new_tmp_dir}" >> $GITHUB_ENV
           else
-            DISPLAY_NAME="${BOARD}"
+            echo "base_dir=${GITHUB_WORKSPACE}" >> $GITHUB_ENV
           fi
 
-          echo "board=${BOARD}" >> $GITHUB_ENV
-          echo "shield=${SHIELD}" >> $GITHUB_ENV
-          echo "snippet=${SNIPPET}" >> $GITHUB_ENV
-          echo "cmake_args=${CMAKE_ARGS}" >> $GITHUB_ENV
-          echo "display_name=${DISPLAY_NAME}" >> $GITHUB_ENV
-          echo "base_dir=$(pwd)" >> $GITHUB_ENV
-          echo "build_dir=$(pwd)/build" >> $GITHUB_ENV
+          if [ -n "${snippet}" ]; then
+            extra_west_args="-S \"${snippet}\""
+          fi
+
+          echo "extra_west_args=${extra_west_args}" >> $GITHUB_ENV
+          echo "extra_cmake_args=${shield:+-DSHIELD=\"$shield\"}${zmk_load_arg}" >> $GITHUB_ENV
+          echo "display_name=${shield:+$shield - }${board}" >> $GITHUB_ENV
+          echo "artifact_name=${artifact_name:-${shield:+$shield-}${board//\//_}-zmk}" >> $GITHUB_ENV
+
+      - name: Copy config files to isolated temporary directory
+        run: |
+          if [ "${{ env.base_dir }}" != "${GITHUB_WORKSPACE}" ]; then
+            mkdir "${{ env.base_dir }}/config"
+            cp -R config/* "${{ env.base_dir }}/config/"
+          fi
 
       - name: Cache west modules
         uses: actions/cache@v4
+        continue-on-error: true
         with:
           path: |
-            zephyr
-            bootloader
-            tools
-            modules
-          key: zmk-west-v2-${{ hashFiles('config/west.yml') }}
+            ${{ env.base_dir }}/modules/
+            ${{ env.base_dir }}/tools/
+            ${{ env.base_dir }}/zephyr/
+            ${{ env.base_dir }}/bootloader/
+            ${{ env.base_dir }}/zmk/
+          key: zmk-west-v3-${{ hashFiles('config/west.yml', 'build.yaml') }}
+          restore-keys: |
+            zmk-west-v3-
 
       - name: West Init
-        run: west init -l config || true
+        working-directory: ${{ env.base_dir }}
+        run: west init -l "${{ env.base_dir }}/config"
 
       - name: West Update
-        run: west update
+        working-directory: ${{ env.base_dir }}
+        run: west update --fetch-opt=--filter=tree:0
 
       - name: Patch Zephyr for CMake 3.31 compatibility
+        working-directory: ${{ env.base_dir }}
         run: |
-          # Fix: CMake 3.31+ treats TEST as a reserved keyword.
-          # Module name "test" (repo name) uppercases to TEST, causing collision.
-          # Quote variables in if() to prevent CMake from parsing as keyword.
           sed -i 's/if(NOT ${MODULE_NAME_UPPER} STREQUAL CURRENT)/if(NOT "${MODULE_NAME_UPPER}" STREQUAL "CURRENT")/g' zephyr/cmake/modules/zephyr_module.cmake
-          echo "=== Verify patch ==="
-          grep -n 'MODULE_NAME_UPPER.*STREQUAL.*CURRENT' zephyr/cmake/modules/zephyr_module.cmake
 
       - name: Check ZMK revision
-        id: zmk-revision
+        working-directory: ${{ env.base_dir }}
         run: |
-          echo "zmk_revision=$(git -C ${{ env.base_dir }}/zmk rev-parse --short HEAD)" >> $GITHUB_ENV
-          echo "$(git -C ${{ env.base_dir }}/zmk rev-parse --short HEAD)"
+          zmk_revision=$(west list -f "{revision}" zmk)
+          echo "zmk_revision=${zmk_revision}" >> $GITHUB_ENV
+          echo "ZMK revision: ${zmk_revision}"
 
       - name: West Zephyr export
+        working-directory: ${{ env.base_dir }}
         run: west zephyr-export
 
       - name: West Build (${{ env.display_name }})
-        run: |
-          west build -s zmk/app -d "${{ env.build_dir }}" -b "${{ env.board }}" -S "${{ env.snippet }}" -- \
-            -DZMK_CONFIG='${{ env.base_dir }}/config' \
-            -DSHIELD="${{ env.shield }}" \
-            -DZMK_EXTRA_MODULES='${{ env.base_dir }}' \
-            ${{ env.cmake_args }}
+        working-directory: ${{ env.base_dir }}
+        shell: sh -x {0}
+        run: west build -s zmk/app -d "${{ env.build_dir }}" -b "${{ matrix.board }}" ${{ env.extra_west_args }} -- -DZMK_CONFIG=${{ env.base_dir }}/config ${{ env.extra_cmake_args }} ${{ matrix.cmake-args }}
 
       - name: Warn about building from main if build fails
-        if: ${{ failure() }}
+        if: failure() && env.zmk_revision == 'main'
         run: |
-          if [ "${{ env.zmk_revision }}" = "main" ] && [ ! -z "${{ env.ACT }}" ]; then
-            echo "::warning file=config/west.yml,title=Main branch unstable::Building from the main branch is unstable and may produce unexpected errors - see https://zmk.dev/docs/user-setup#unstable-builds"
-          fi
+          echo "## Build may be unstable" >> $GITHUB_STEP_SUMMARY
+          echo "Building from ZMK main branch. Consider pinning to a release: https://zmk.dev/blog/2025/06/20/pinned-zmk" >> $GITHUB_STEP_SUMMARY
 
       - name: ${{ env.display_name }} Kconfig file
         run: |
