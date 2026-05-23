@@ -93,9 +93,9 @@ jobs:
             ${{ env.base_dir }}/zephyr/
             ${{ env.base_dir }}/bootloader/
             ${{ env.base_dir }}/zmk/
-          key: zmk-west-${{ hashFiles('config/west.yml', 'build.yaml') }}
+          key: zmk-v03-west-${{ hashFiles('config/west.yml', 'build.yaml') }}
           restore-keys: |
-            zmk-west-
+            zmk-v03-west-
 
       - name: West Init
         working-directory: ${{ env.base_dir }}
