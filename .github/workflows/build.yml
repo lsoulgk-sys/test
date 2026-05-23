@@ -70,11 +70,6 @@ jobs:
           echo "base_dir=$(pwd)" >> $GITHUB_ENV
           echo "build_dir=$(pwd)/build" >> $GITHUB_ENV
 
-      - name: Copy config files to isolated temporary directory
-        run: |
-          mkdir /tmp/zmk-config
-          cp -R "config" /tmp/zmk-config/config
-
       - name: Cache west modules
         uses: actions/cache@v4
         with:
@@ -86,7 +81,7 @@ jobs:
           key: zmk-west-${{ hashFiles('config/west.yml') }}
 
       - name: West Init
-        run: west init -l /tmp/zmk-config/config || true
+        run: west init -l config || true
 
       - name: Downgrade CMake (Zephyr 4.1.0 + CMake 3.31 incompatibility)
         run: |
@@ -108,7 +103,7 @@ jobs:
       - name: West Build (${{ env.display_name }})
         run: |
           west build -s zmk/app -d "${{ env.build_dir }}" -b "${{ env.board }}" -S "${{ env.snippet }}" -- \
-            -DZMK_CONFIG=/tmp/zmk-config/config \
+            -DZMK_CONFIG='${{ github.workspace }}/config' \
             -DSHIELD="${{ env.shield }}" \
             -DZMK_EXTRA_MODULES='${{ github.workspace }}/.' \
             ${{ env.cmake_args }}
