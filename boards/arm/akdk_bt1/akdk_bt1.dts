@@ -15,10 +15,6 @@
 		zmk,battery = &vbatt;
 	};
 
-	sram0: memory@20000000 {
-		reg = <0x20000000 0x40000>;
-	};
-
 	akdk_d: connector {
 		compatible = "seeed,xiao-gpio";
 		#gpio-cells = <2>;
@@ -121,4 +117,8 @@ zephyr_udc0: &usbd {
 			reg = <0x000f4000 0x0000c000>;
 		};
 	};
+};
+
+&sram0 {
+	reg = <0x20000000 0x40000>;
 };
