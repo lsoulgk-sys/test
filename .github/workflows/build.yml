@@ -92,10 +92,10 @@ jobs:
           # Workaround: quote the variable in if() comparison.
           echo "=== Before patch ==="
           grep -n 'TEST.*CURRENT' zephyr/cmake/modules/zephyr_module.cmake || echo "(no match found)"
-          sed -i 's/\bTEST\b/"${TEST}"/g' zephyr/cmake/modules/zephyr_module.cmake
-          sed -i 's/\bCURRENT\b/"CURRENT"/g' zephyr/cmake/modules/zephyr_module.cmake
+          sed -i 's/if *( *NOT *TEST *STREQUAL *CURRENT *)/if(NOT "${TEST}" STREQUAL "CURRENT")/g' zephyr/cmake/modules/zephyr_module.cmake
           echo "=== After patch ==="
           grep -n 'TEST.*CURRENT' zephyr/cmake/modules/zephyr_module.cmake || echo "(no match found)"
+          grep -n 'NOT.*TEST.*STREQUAL.*CURRENT' zephyr/cmake/modules/zephyr_module.cmake || echo "(after patch - no match)"
 
       - name: Check ZMK revision
         id: zmk-revision
@@ -112,6 +112,7 @@ jobs:
             -DZMK_CONFIG='${{ env.base_dir }}/config' \
             -DSHIELD="${{ env.shield }}" \
             -DZMK_EXTRA_MODULES='${{ env.base_dir }}' \
+            -DCMAKE_POLICY_DEFAULT_CMP0167=OLD \
             ${{ env.cmake_args }}
 
       - name: Warn about building from main if build fails
