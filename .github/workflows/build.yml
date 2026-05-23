@@ -112,6 +112,11 @@ jobs:
         working-directory: ${{ env.base_dir }}
         run: west update --fetch-opt=--filter=tree:0
 
+      - name: Patch Zephyr for CMake 3.31 compatibility
+        working-directory: ${{ env.base_dir }}
+        run: |
+          sed -i 's/if(NOT ${MODULE_NAME_UPPER} STREQUAL CURRENT)/if(NOT "${MODULE_NAME_UPPER}" STREQUAL "CURRENT")/g' zephyr/cmake/modules/zephyr_module.cmake
+
       - name: Check ZMK revision
         working-directory: ${{ env.base_dir }}
         run: |
