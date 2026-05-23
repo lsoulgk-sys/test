@@ -67,6 +67,8 @@ jobs:
           echo "snippet=${SNIPPET}" >> $GITHUB_ENV
           echo "cmake_args=${CMAKE_ARGS}" >> $GITHUB_ENV
           echo "display_name=${DISPLAY_NAME}" >> $GITHUB_ENV
+          echo "base_dir=$(pwd)" >> $GITHUB_ENV
+          echo "build_dir=$(pwd)/build" >> $GITHUB_ENV
 
       - name: Copy config files to isolated temporary directory
         run: |
@@ -84,10 +86,10 @@ jobs:
           key: zmk-west-${{ hashFiles('config/west.yml') }}
 
       - name: West Init
-        run: west init -l /tmp/zmk-config || true
+        run: west init -l /tmp/zmk-config/config || true
 
       - name: Downgrade CMake (Zephyr 4.1.0 + CMake 3.31 incompatibility)
-        run: pip install cmake==3.30.5
+        run: pip3 install --break-system-packages cmake==3.30.5
 
       - name: West Update
         run: west update
@@ -103,10 +105,10 @@ jobs:
 
       - name: West Build (${{ env.display_name }})
         run: |
-          west build -s zmk/app -d "/tmp/tmp.$$$" -b "${{ env.board }}" -S "${{ env.snippet }}" -- \
+          west build -s zmk/app -d "${{ env.build_dir }}" -b "${{ env.board }}" -S "${{ env.snippet }}" -- \
             -DZMK_CONFIG=/tmp/zmk-config/config \
             -DSHIELD="${{ env.shield }}" \
-            -DZMK_EXTRA_MODULES='${{ env.GITHUB_WORKSPACE }}/.' \
+            -DZMK_EXTRA_MODULES='${{ github.workspace }}/.' \
             ${{ env.cmake_args }}
 
       - name: Warn about building from main if build fails
