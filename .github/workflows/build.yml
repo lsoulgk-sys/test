@@ -103,9 +103,9 @@ jobs:
       - name: West Build (${{ env.display_name }})
         run: |
           west build -s zmk/app -d "${{ env.build_dir }}" -b "${{ env.board }}" -S "${{ env.snippet }}" -- \
-            -DZMK_CONFIG='${{ github.workspace }}/config' \
+            -DZMK_CONFIG='${{ env.base_dir }}/config' \
             -DSHIELD="${{ env.shield }}" \
-            -DZMK_EXTRA_MODULES='${{ github.workspace }}/.' \
+            -DZMK_EXTRA_MODULES='${{ env.base_dir }}' \
             ${{ env.cmake_args }}
 
       - name: Warn about building from main if build fails
