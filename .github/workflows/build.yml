@@ -83,16 +83,14 @@ jobs:
       - name: West Init
         run: west init -l config || true
 
-      - name: Downgrade CMake (Zephyr 4.1.0 + CMake 3.31 incompatibility)
-        run: |
-          cmake --version || true
-          apt-get update && apt-get install -y python3-pip
-          rm -f /usr/local/bin/cmake /usr/local/bin/ctest /usr/local/bin/cpack
-          pip3 install --break-system-packages cmake==3.30.5
-          cmake --version
-
       - name: West Update
         run: west update
+
+      - name: Patch Zephyr for CMake 3.31 compatibility
+        run: |
+          # Fix: CMake 3.31+ treats TEST as a reserved keyword.
+          # Workaround: quote the variable in if() comparison.
+          sed -i 's/if(NOT TEST STREQUAL CURRENT)/if(NOT "${TEST}" STREQUAL "CURRENT")/g' zephyr/cmake/modules/zephyr_module.cmake
 
       - name: Check ZMK revision
         id: zmk-revision
