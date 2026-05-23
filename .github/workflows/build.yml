@@ -86,16 +86,24 @@ jobs:
       - name: West Update
         run: west update
 
+      - name: Diagnostic - CMake version and Zephyr file content
+        run: |
+          echo "=== CMake version ==="
+          cmake --version || true
+          which cmake || true
+          echo "=== zephyr_module.cmake around line 139 ==="
+          sed -n '130,150p' zephyr/cmake/modules/zephyr_module.cmake 2>/dev/null || echo "(file not found)"
+          echo "=== Search for TEST in file ==="
+          grep -n 'TEST' zephyr/cmake/modules/zephyr_module.cmake 2>/dev/null || echo "(no TEST found)"
+          echo "=== File listing ==="
+          ls -la zephyr/cmake/modules/zephyr_module.cmake 2>/dev/null || echo "(file not found)"
+
       - name: Patch Zephyr for CMake 3.31 compatibility
         run: |
           # Fix: CMake 3.31+ treats TEST as a reserved keyword.
-          # Workaround: quote the variable in if() comparison.
-          echo "=== Before patch ==="
-          grep -n 'TEST.*CURRENT' zephyr/cmake/modules/zephyr_module.cmake || echo "(no match found)"
-          sed -i 's/if *( *NOT *TEST *STREQUAL *CURRENT *)/if(NOT "${TEST}" STREQUAL "CURRENT")/g' zephyr/cmake/modules/zephyr_module.cmake
-          echo "=== After patch ==="
-          grep -n 'TEST.*CURRENT' zephyr/cmake/modules/zephyr_module.cmake || echo "(no match found)"
-          grep -n 'NOT.*TEST.*STREQUAL.*CURRENT' zephyr/cmake/modules/zephyr_module.cmake || echo "(after patch - no match)"
+          sed -i 's/\bif *( *NOT *TEST *STREQUAL *CURRENT *)/if(NOT "${TEST}" STREQUAL "CURRENT")/g' zephyr/cmake/modules/zephyr_module.cmake
+          echo "=== Verify patch ==="
+          grep -n 'TEST' zephyr/cmake/modules/zephyr_module.cmake || echo "(no TEST found - patch may have worked or file missing)"
 
       - name: Check ZMK revision
         id: zmk-revision
