@@ -1,5 +1,5 @@
 /dts-v1/;
-#include <nordic/nrf52840.dtsi>
+#include <nordic/nrf52840_qiaa.dtsi>
 
 #include <dt-bindings/zmk/matrix_transform.h>
 
@@ -79,13 +79,7 @@ zephyr_udc0: &usbd {
 	status = "okay";
 };
 
-&sram0 {
-	reg = <0x20000000 0x40000>;
-};
-
 &flash0 {
-	reg = <0x00000000 0x100000>;
-
 	/*
 	 * For more information, see:
 	 * http://docs.zephyrproject.org/latest/devices/dts/flash_partitions.html
