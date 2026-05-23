@@ -86,24 +86,14 @@ jobs:
       - name: West Update
         run: west update
 
-      - name: Diagnostic - CMake version and Zephyr file content
-        run: |
-          echo "=== CMake version ==="
-          cmake --version || true
-          which cmake || true
-          echo "=== zephyr_module.cmake around line 139 ==="
-          sed -n '130,150p' zephyr/cmake/modules/zephyr_module.cmake 2>/dev/null || echo "(file not found)"
-          echo "=== Search for TEST in file ==="
-          grep -n 'TEST' zephyr/cmake/modules/zephyr_module.cmake 2>/dev/null || echo "(no TEST found)"
-          echo "=== File listing ==="
-          ls -la zephyr/cmake/modules/zephyr_module.cmake 2>/dev/null || echo "(file not found)"
-
       - name: Patch Zephyr for CMake 3.31 compatibility
         run: |
           # Fix: CMake 3.31+ treats TEST as a reserved keyword.
-          sed -i 's/\bif *( *NOT *TEST *STREQUAL *CURRENT *)/if(NOT "${TEST}" STREQUAL "CURRENT")/g' zephyr/cmake/modules/zephyr_module.cmake
+          # Module name "test" (repo name) uppercases to TEST, causing collision.
+          # Quote variables in if() to prevent CMake from parsing as keyword.
+          sed -i 's/if(NOT ${MODULE_NAME_UPPER} STREQUAL CURRENT)/if(NOT "${MODULE_NAME_UPPER}" STREQUAL "CURRENT")/g' zephyr/cmake/modules/zephyr_module.cmake
           echo "=== Verify patch ==="
-          grep -n 'TEST' zephyr/cmake/modules/zephyr_module.cmake || echo "(no TEST found - patch may have worked or file missing)"
+          grep -n 'MODULE_NAME_UPPER.*STREQUAL.*CURRENT' zephyr/cmake/modules/zephyr_module.cmake
 
       - name: Check ZMK revision
         id: zmk-revision
@@ -120,7 +110,6 @@ jobs:
             -DZMK_CONFIG='${{ env.base_dir }}/config' \
             -DSHIELD="${{ env.shield }}" \
             -DZMK_EXTRA_MODULES='${{ env.base_dir }}' \
-            -DCMAKE_POLICY_DEFAULT_CMP0167=OLD \
             ${{ env.cmake_args }}
 
       - name: Warn about building from main if build fails
