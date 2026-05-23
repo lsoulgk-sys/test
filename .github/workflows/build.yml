@@ -90,7 +90,12 @@ jobs:
         run: |
           # Fix: CMake 3.31+ treats TEST as a reserved keyword.
           # Workaround: quote the variable in if() comparison.
-          sed -i 's/if(NOT TEST STREQUAL CURRENT)/if(NOT "${TEST}" STREQUAL "CURRENT")/g' zephyr/cmake/modules/zephyr_module.cmake
+          echo "=== Before patch ==="
+          grep -n 'TEST.*CURRENT' zephyr/cmake/modules/zephyr_module.cmake || echo "(no match found)"
+          sed -i 's/\bTEST\b/"${TEST}"/g' zephyr/cmake/modules/zephyr_module.cmake
+          sed -i 's/\bCURRENT\b/"CURRENT"/g' zephyr/cmake/modules/zephyr_module.cmake
+          echo "=== After patch ==="
+          grep -n 'TEST.*CURRENT' zephyr/cmake/modules/zephyr_module.cmake || echo "(no match found)"
 
       - name: Check ZMK revision
         id: zmk-revision
